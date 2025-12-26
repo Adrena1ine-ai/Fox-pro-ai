@@ -407,26 +407,221 @@ build/
 
 
 # ══════════════════════════════════════════════════════════════
+# OUTPUT FORMATTING
+# ══════════════════════════════════════════════════════════════
+
+def print_optimization_result(
+    project_name: str,
+    before_tokens: int,
+    after_tokens: int,
+    files_moved: int,
+    files_patched: int,
+    symlinks_created: int,
+    dynamic_warnings: int
+):
+    """Print beautiful optimization result."""
+    print()
+    print("╔══════════════════════════════════════════════════════════════════╗")
+    print("║  🦊 FOX PRO AI — OPTIMIZATION COMPLETE                           ║")
+    print("╠══════════════════════════════════════════════════════════════════╣")
+    print(f"║  Project: {project_name:<55}║")
+    print("╠══════════════════════════════════════════════════════════════════╣")
+    print("║                        BEFORE          AFTER                     ║")
+    
+    before_str = f"{before_tokens/1000:.0f}K" if before_tokens < 1_000_000 else f"{before_tokens/1_000_000:.1f}M"
+    after_str = f"{after_tokens/1000:.0f}K" if after_tokens < 1_000_000 else f"{after_tokens/1_000_000:.1f}M"
+    reduction = int((1 - after_tokens / before_tokens) * 100) if before_tokens > 0 else 0
+    
+    print(f"║  Tokens:              {before_str:>8}     →   {after_str:<8}  ({reduction}% reduction)  ║")
+    print(f"║  Files moved:         {files_moved:>8}                                   ║")
+    print(f"║  Files patched:       {files_patched:>8}                                   ║")
+    
+    if symlinks_created > 0:
+        print(f"║  Symlinks created:    {symlinks_created:>8}                                   ║")
+    
+    if dynamic_warnings > 0:
+        print(f"║  Dynamic paths:       {dynamic_warnings:>8}     (covered by symlinks)        ║")
+    
+    print("╠══════════════════════════════════════════════════════════════════╣")
+    print("║  📄 Generated Files:                                             ║")
+    print("║  ├─ config_paths.py          (bridge to external files)          ║")
+    print("║  ├─ AST_FOX_TRACE.md         (navigation map for AI)             ║")
+    print("║  └─ .cursorignore            (updated)                           ║")
+    print("╠══════════════════════════════════════════════════════════════════╣")
+    print("║  💡 Your project is now AI-optimized!                            ║")
+    print("║  💡 Restore: fox doctor . --restore                              ║")
+    print("╚══════════════════════════════════════════════════════════════════╝")
+
+
+def print_diagnostic_report(report: DoctorReport):
+    """Print beautiful diagnostic report."""
+    print()
+    print("╔══════════════════════════════════════════════════════════════════╗")
+    print("║  🩺 FOX PRO AI DOCTOR — Project Analysis                         ║")
+    print("╠══════════════════════════════════════════════════════════════════╣")
+    print(f"║  Project: {report.project_name:<55}║")
+    print(f"║  Files:   {report.total_files:<55}║")
+    
+    # Token status with color indicator
+    if report.total_tokens > 1_000_000:
+        token_str = f"{report.total_tokens/1_000_000:.1f}M tokens (🔴 CRITICAL)"
+    elif report.total_tokens > 100_000:
+        token_str = f"{report.total_tokens/1_000:.0f}K tokens (🟡 HIGH)"
+    else:
+        token_str = f"{report.total_tokens/1_000:.0f}K tokens (🟢 OK)"
+    
+    print(f"║  Tokens:  {token_str:<55}║")
+    print("╠══════════════════════════════════════════════════════════════════╣")
+    
+    # Issues by severity
+    critical = [i for i in report.issues if i.severity == "CRITICAL"]
+    warnings = [i for i in report.issues if i.severity == "WARNING"]
+    suggestions = [i for i in report.issues if i.severity == "SUGGESTION"]
+    
+    if critical:
+        print(f"║  🔴 CRITICAL ({len(critical)}):                                              ║")
+        for issue in critical[:5]:
+            desc = issue.description[:58]
+            print(f"║     • {desc:<60}║")
+        if len(critical) > 5:
+            print(f"║     ... and {len(critical) - 5} more{' '*45}║")
+    
+    if warnings:
+        print(f"║  🟡 WARNINGS ({len(warnings)}):                                              ║")
+        for issue in warnings[:5]:
+            desc = issue.description[:58]
+            print(f"║     • {desc:<60}║")
+        if len(warnings) > 5:
+            print(f"║     ... and {len(warnings) - 5} more{' '*45}║")
+    
+    # Top token consumers
+    heavy_issues = [i for i in report.issues if i.category == "heavy_file"]
+    if heavy_issues:
+        print("╠══════════════════════════════════════════════════════════════════╣")
+        print("║  📊 TOP TOKEN CONSUMERS:                                         ║")
+        for issue in heavy_issues[:10]:
+            tokens = f"{issue.tokens/1000:.1f}K" if issue.tokens else "?"
+            path = str(issue.path.name)[:40] if issue.path else "unknown"
+            print(f"║     {tokens:>8}  {path:<50}║")
+        if len(heavy_issues) > 10:
+            print(f"║     ... and {len(heavy_issues) - 10} more files{' '*40}║")
+    
+    print("╠══════════════════════════════════════════════════════════════════╣")
+    print("║  ACTIONS:                                                        ║")
+    print("║  fox doctor . --fix       Fix issues automatically               ║")
+    print("║  fox doctor . --full      Full optimization (move + patch)       ║")
+    print("║  fox doctor . --restore   Restore from backup                    ║")
+    print("╚══════════════════════════════════════════════════════════════════╝")
+
+
+# ══════════════════════════════════════════════════════════════
 # FULL OPTIMIZATION (Deep Clean)
 # ══════════════════════════════════════════════════════════════
+
+def regenerate_config_paths(
+    project_path: Path,
+    all_paths: set[str],
+    external_dir: Path
+) -> None:
+    """
+    Regenerate config_paths.py with all moved file paths.
+    
+    Args:
+        project_path: Project root path
+        all_paths: Set of all relative paths that were moved
+        external_dir: External storage directory
+    """
+    from datetime import datetime
+    
+    project_name = project_path.name
+    # Get external directory name (could be project_name_data or project_name_fox)
+    external_name = external_dir.name
+    
+    # Build file mappings
+    mappings = []
+    for path in sorted(all_paths):
+        # Use forward slashes for consistency
+        orig_key = path.replace("\\", "/")
+        # Escape backslashes in path strings
+        escaped_path = orig_key.replace("\\", "\\\\")
+        mappings.append(f'    "{orig_key}": EXTERNAL_DATA / "{escaped_path}",')
+    
+    # Generate Python code
+    code = f'''"""
+Auto-generated by Fox Pro AI Deep Clean
+DO NOT EDIT — regenerate with `fox doctor --full`
+
+Generated: {datetime.now().isoformat()}
+Project: {project_name}
+Files moved: {len(all_paths)}
+"""
+from pathlib import Path
+
+# External storage location
+# Relative to project root: ../{external_name}/
+EXTERNAL_DATA = Path(__file__).parent.parent / "{external_name}"
+
+# File mappings (original relative path → external Path)
+FILES_MAP = {{
+{chr(10).join(mappings)}
+}}
+
+
+def get_path(original: str) -> Path:
+    """
+    Get external path for original file location.
+    
+    Usage:
+        from config_paths import get_path
+        data = json.load(open(get_path("data/products.json")))
+    
+    Args:
+        original: Original relative path (e.g., "data/products.json")
+    
+    Returns:
+        Path to file in external storage
+    
+    Raises:
+        FileNotFoundError: If no mapping exists
+    """
+    # Normalize path separators
+    normalized = original.replace("\\\\", "/")
+    
+    if normalized in FILES_MAP:
+        return FILES_MAP[normalized]
+    
+    # Fallback: return original (file not moved)
+    return Path(original)
+'''
+    
+    bridge_path = project_path / "config_paths.py"
+    bridge_path.write_text(code, encoding="utf-8")
+
 
 def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
     """
     Full optimization — Deep Clean.
     
+    Idempotent: safe to run multiple times.
+    - First run: moves heavy files
+    - Subsequent runs: skips already moved files, picks up new ones
+    
     Steps:
-        1. Scan for heavy files
-        2. Move to external storage
-        3. Generate bridge (config_paths.py)
-        4. Patch code (AST)
-        5. Generate trace map
-        6. Clean garbage
+        1. Load existing manifest (if any)
+        2. Scan for heavy files
+        3. Move new heavy files to external storage
+        4. Regenerate bridge (config_paths.py) with ALL files
+        5. Patch code (AST)
+        6. Generate trace map
+        7. Clean garbage
     """
     from ..scanner.token_scanner import scan_project as token_scan, get_moveable_files
     from ..optimizer.heavy_mover import move_heavy_files
     from ..optimizer.ast_patcher import patch_project
     from ..optimizer.garbage_cleaner import scan_garbage, clean_garbage
     from ..mapper.fox_trace_map import generate_fox_trace_map
+    from ..core.paths import load_manifest
+    from ..optimizer.heavy_mover import get_external_dir
     
     result = FixResult(success=True, message="")
     project_path = Path(project_path).resolve()
@@ -434,6 +629,15 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
     print(f"\n{COLORS.BOLD}🦊 Fox Pro AI — Full Optimization{COLORS.END}\n")
     print(f"Project: {project_path.name}")
     print(f"{'─' * 50}\n")
+    
+    # Load existing manifest (if any)
+    existing_manifest = load_manifest(project_path)
+    already_moved_paths = set()
+    
+    if existing_manifest and "files" in existing_manifest:
+        already_moved_paths = {f["original"] for f in existing_manifest["files"] if "original" in f}
+        if already_moved_paths:
+            print(f"{COLORS.CYAN}ℹ️  Found {len(already_moved_paths)} previously moved files{COLORS.END}\n")
     
     # Step 1: Scan
     print(f"{COLORS.CYAN}[1/6] Scanning project...{COLORS.END}")
@@ -452,11 +656,15 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
     
     # Step 2: Move
     print(f"\n{COLORS.CYAN}[2/6] Moving heavy files...{COLORS.END}")
-    moveable = get_moveable_files(scan_result)
+    moveable = get_moveable_files(scan_result, exclude_paths=already_moved_paths)
     move_result = None  # Initialize for later checks
     
     if not moveable:
-        print("  No files to move")
+        if already_moved_paths:
+            print(f"  ✅ All heavy files already moved ({len(already_moved_paths)} files)")
+            print(f"  ℹ️  No new heavy files found")
+        else:
+            print("  No files to move")
     elif dry_run:
         for f in moveable:
             print(f"  Would move: {f.path.name} ({f.estimated_tokens:,} tokens)")
@@ -473,29 +681,41 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
         except Exception as e:
             result.errors.append(f"Move failed: {e}")
     
-    # Step 3: Bridge
+    # Step 3: Bridge - Regenerate with ALL moved files (old + new)
     print(f"\n{COLORS.CYAN}[3/6] Generating bridge...{COLORS.END}")
-    if not dry_run and moveable:
-        # Bridge is already generated by move_heavy_files
-        # Just check if it exists
-        bridge_path = project_path / "config_paths.py"
-        if bridge_path.exists():
-            print(f"  ✅ Created config_paths.py")
-        elif move_result and move_result.config_paths_file:
-            print(f"  ✅ Created config_paths.py")
+    if not dry_run:
+        # Объединяем старые + новые перемещённые файлы
+        all_moved_paths = already_moved_paths.copy()
+        if move_result and move_result.moved_files:
+            for mf in move_result.moved_files:
+                all_moved_paths.add(mf.original_relative)
+        
+        if all_moved_paths:
+            # Регенерируем bridge со всеми файлами
+            external_dir = get_external_dir(project_path, create=False)
+            if external_dir.exists() or already_moved_paths or (move_result and move_result.moved_files):
+                regenerate_config_paths(project_path, all_moved_paths, external_dir)
+                print(f"  ✅ Updated config_paths.py ({len(all_moved_paths)} paths)")
+            else:
+                print(f"  ⚠️  External dir not found, skipping bridge regeneration")
         else:
-            print(f"  ⚠ Bridge not created (move may have failed)")
+            print("  Skipped (no moved files)")
     else:
-        print("  Skipped (dry run or no files)")
+        print("  Skipped (dry run)")
     
     # Step 4: Patch
     print(f"\n{COLORS.CYAN}[4/6] Patching code...{COLORS.END}")
-    if not dry_run and moveable:
+    patch_report = None
+    
+    # Use all moved paths (old + new) for patching
+    all_moved_paths_for_patch = already_moved_paths.copy()
+    if move_result and move_result.moved_files:
+        for mf in move_result.moved_files:
+            all_moved_paths_for_patch.add(mf.original_relative)
+    
+    if not dry_run and all_moved_paths_for_patch:
         try:
-            # Convert HeavyFile list to set of path strings
-            moved_paths = {hf.relative_path for hf in moveable}
-            
-            patch_report = patch_project(project_path, moved_paths)
+            patch_report = patch_project(project_path, all_moved_paths_for_patch)
             result.files_patched = patch_report.files_patched
             print(f"  ✅ Patched {result.files_patched} files")
             
@@ -565,20 +785,26 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
     except Exception as e:
         result.errors.append(f"Garbage clean failed: {e}")
     
-    # Summary
-    print(f"\n{'─' * 50}")
+    # Summary with beautiful output
+    if not dry_run:
+        print_optimization_result(
+            project_name=project_path.name,
+            before_tokens=scan_result.total_tokens,
+            after_tokens=scan_result.total_tokens - result.tokens_saved,
+            files_moved=result.files_moved,
+            files_patched=result.files_patched,
+            symlinks_created=len(move_result.symlinks_created) if move_result and move_result.symlinks_created else 0,
+            dynamic_warnings=len(patch_report.dynamic_path_warnings) if patch_report and patch_report.dynamic_path_warnings else 0,
+        )
+    
     if result.errors:
         result.success = False
         result.message = f"Completed with {len(result.errors)} errors"
-        print(f"{COLORS.YELLOW}⚠ {result.message}{COLORS.END}")
+        print(f"\n{COLORS.YELLOW}⚠ Errors:{COLORS.END}")
         for err in result.errors:
             print(f"  • {err}")
     else:
         result.message = "Full optimization completed!"
-        print(f"{COLORS.GREEN}✅ {result.message}{COLORS.END}")
-        print(f"   Moved: {result.files_moved} files")
-        print(f"   Patched: {result.files_patched} files")
-        print(f"   Tokens saved: {result.tokens_saved:,}")
     
     return result
 
@@ -658,7 +884,10 @@ def run_doctor(
     report = diagnose(project_path, verbose)
     
     # Print report
-    _print_report(report)
+    if mode == "report":
+        print_diagnostic_report(report)
+    else:
+        _print_report(report)
     
     # Fix mode
     if mode == "fix" and report.issues:

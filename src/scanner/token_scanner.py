@@ -165,7 +165,8 @@ def scan_file(
     project_root: Path,
     threshold: int,
     include_code: bool,
-    extract_schemas: bool
+    extract_schemas: bool,
+    debug: bool = False
 ) -> Optional[HeavyFile]:
     """
     Scan single file and return HeavyFile if exceeds threshold.
@@ -179,16 +180,22 @@ def scan_file(
     
     # Under threshold - skip
     if tokens < threshold:
+        if debug and tokens > 0:
+            print(f"DEBUG: {file_path.name} skipped: {tokens} < {threshold} tokens")
         return None
     
     category = categorize_file(file_path)
     
     # Skip code unless requested
     if category == FileCategory.CODE and not include_code:
+        if debug:
+            print(f"DEBUG: {file_path.name} skipped: CODE file, include_code=False")
         return None
     
     # Skip binary
     if category == FileCategory.BINARY:
+        if debug:
+            print(f"DEBUG: {file_path.name} skipped: BINARY file")
         return None
     
     # Create HeavyFile
@@ -226,7 +233,8 @@ def scan_project(
     threshold: int = 1000,
     include_code: bool = False,
     extract_schemas: bool = True,
-    show_progress: bool = False
+    show_progress: bool = False,
+    debug: bool = False
 ) -> ScanResult:
     """
     Scan project for files exceeding token threshold.
@@ -282,7 +290,7 @@ def scan_project(
                     # Check if heavy
                     heavy_file = scan_file(
                         file_path, project_path, threshold, 
-                        include_code, extract_schemas
+                        include_code, extract_schemas, debug
                     )
                     
                     if heavy_file:
@@ -376,42 +384,53 @@ def format_scan_report(result: ScanResult) -> str:
     return "\n".join(lines)
 
 
-def get_moveable_files(result: ScanResult) -> List[HeavyFile]:
+def get_moveable_files(
+    result: ScanResult,
+    exclude_paths: set[str] | None = None
+) -> List[HeavyFile]:
     """
     Get files that can be safely moved to external storage.
     
+    Args:
+        result: ScanResult with heavy files
+        exclude_paths: Set of relative paths to exclude (already moved files)
+    
     Excludes:
-    - Core code files (main.py, __init__.py, etc.)
-    - Config files that must stay in project
+    - Python code files (.py) - project code should stay
+    - Core config files that must stay in project
     - Files already in external dirs
+    - Files in exclude_paths (already moved)
     """
+    exclude_paths = exclude_paths or set()
     moveable = []
     
-    # Files that should NOT be moved
+    # Files that should NOT be moved (config files)
     protected_names = {
-        "main.py", "__init__.py", "__main__.py",
-        "config.py", "settings.py", "constants.py",
-        "requirements.txt", "pyproject.toml", "setup.py",
+        "pyproject.toml", "package.json", "requirements.txt",
+        "setup.py", "setup.cfg",
         ".env", ".env.example",
         "README.md", "CLAUDE.md", ".cursorrules",
         "config_paths.py",  # Bridge file must stay
     }
     
     for hf in result.heavy_files:
-        # Skip protected files
+        # Пропускаем уже перемещённые
+        if hf.relative_path in exclude_paths:
+            continue
+        
+        # Не перемещаем Python файлы (код проекта)
+        if hf.path.suffix == '.py':
+            continue
+        
+        # Не перемещаем конфиги
         if hf.path.name.lower() in protected_names:
             continue
         
         # Skip files already in external dirs
-        if any(external in hf.relative_path for external in ["_venvs", "_data", "_artifacts", "_logs"]):
+        if any(external in hf.relative_path for external in ["_venvs", "_data", "_artifacts", "_logs", "_fox"]):
             continue
         
-        # Skip code files (unless they're pure data)
-        if hf.category == FileCategory.CODE:
-            # Check if it's a data-heavy Python file (large dicts)
-            if not hf.can_extract_schema:
-                continue
-        
+        # Всё остальное с >1000 токенов — перемещаем
         moveable.append(hf)
     
     return moveable
