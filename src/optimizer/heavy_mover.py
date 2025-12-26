@@ -446,7 +446,8 @@ def get_schema(original: str) -> dict:
 def generate_manifest(
     project_path: Path,
     moved_files: List[MovedFile],
-    external_dir: Path
+    external_dir: Path,
+    original_tokens: Optional[int] = None
 ) -> Path:
     """
     Generate manifest.json in external directory.
@@ -458,6 +459,7 @@ def generate_manifest(
         "project": "my_bot",
         "created": "2024-12-24T12:00:00",
         "toolkit_version": "3.4",
+        "original_tokens": 5000000,  # Total tokens before optimization
         "files": [
             {
                 "original": "data/products.json",
@@ -490,6 +492,10 @@ def generate_manifest(
             for mf in moved_files
         ]
     }
+    
+    # Add original_tokens if provided (for tracking optimization effectiveness)
+    if original_tokens is not None:
+        manifest["original_tokens"] = original_tokens
     
     manifest_path = external_dir / "manifest.json"
     manifest_path.write_text(

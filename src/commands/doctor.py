@@ -418,23 +418,64 @@ def print_optimization_result(
     files_patched: int,
     symlinks_created: int,
     dynamic_warnings: int,
-    ast_skeleton=None
+    ast_skeleton=None,
+    is_already_optimized: bool = False
 ):
     """Print beautiful optimization result."""
     print()
     print("╔══════════════════════════════════════════════════════════════════╗")
-    print("║  🦊 FOX PRO AI — OPTIMIZATION COMPLETE                           ║")
+    
+    # Show if already optimized
+    if is_already_optimized:
+        print(f"║  🦊 FOX PRO AI — OPTIMIZATION COMPLETE (already optimized)    ║")
+    else:
+        print("║  🦊 FOX PRO AI — OPTIMIZATION COMPLETE                           ║")
+    
     print("╠══════════════════════════════════════════════════════════════════╣")
     print(f"║  Project: {project_name:<55}║")
+    
+    # Calculate effective tokens (with AST skeleton)
+    actual_after_tokens = after_tokens
+    py_tokens_saved = 0
+    ast_files_count = 0
+    ast_reduction = 0
+    
+    if ast_skeleton and ast_skeleton.files:
+        py_orig = ast_skeleton.total_original_tokens
+        py_skel = ast_skeleton.total_skeleton_tokens
+        py_tokens_saved = py_orig - py_skel
+        # AI будет читать AST_CODE_MAP вместо .py файлов
+        actual_after_tokens = after_tokens - py_orig + py_skel
+        ast_files_count = len(ast_skeleton.files)
+        ast_reduction = ast_skeleton.reduction_percent
+    
+    # Effective tokens section
+    if ast_skeleton and ast_skeleton.files:
+        print("╠══════════════════════════════════════════════════════════════════╣")
+        print("║  📊 Effective tokens for AI:                                     ║")
+        scan_str = f"{before_tokens:,}"
+        print(f"║     Scanned: {scan_str:>8}                                    ║")
+        py_saved_str = f"-{py_tokens_saved:,}"
+        print(f"║     .py → AST: {py_saved_str:>8} ({ast_reduction}% of .py)       ║")
+        print(f"║     ─────────────────────                                        ║")
+        effective_str = f"{actual_after_tokens:,}"
+        print(f"║     Effective: {effective_str:>8} tokens                         ║")
+    
     print("╠══════════════════════════════════════════════════════════════════╣")
     print("║                        BEFORE          AFTER                     ║")
     
     before_str = f"{before_tokens/1000:.0f}K" if before_tokens < 1_000_000 else f"{before_tokens/1_000_000:.1f}M"
-    after_str = f"{after_tokens/1000:.0f}K" if after_tokens < 1_000_000 else f"{after_tokens/1_000_000:.1f}M"
-    reduction = int((1 - after_tokens / before_tokens) * 100) if before_tokens > 0 else 0
+    actual_after_str = f"{actual_after_tokens/1000:.0f}K" if actual_after_tokens < 1_000_000 else f"{actual_after_tokens/1_000_000:.1f}M"
+    actual_reduction = int((1 - actual_after_tokens / before_tokens) * 100) if before_tokens > 0 else 0
     
-    print(f"║  Tokens:              {before_str:>8}     →   {after_str:<8}  ({reduction}% reduction)  ║")
-    print(f"║  Files moved:         {files_moved:>8}                                   ║")
+    print(f"║  Tokens:              {before_str:>8}     →   {actual_after_str:<8}  ({actual_reduction}% reduction)  ║")
+    
+    # Show files moved info
+    if files_moved == 0 and is_already_optimized:
+        print(f"║  Files moved:         {files_moved:>8} (project already optimized)        ║")
+    else:
+        print(f"║  Files moved:         {files_moved:>8}                                   ║")
+    
     print(f"║  Files patched:       {files_patched:>8}                                   ║")
     
     # Show .py files optimization if AST skeleton was generated
@@ -643,11 +684,18 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
     # Load existing manifest (if any)
     existing_manifest = load_manifest(project_path)
     already_moved_paths = set()
+    original_tokens_from_manifest = None
     
     if existing_manifest and "files" in existing_manifest:
         already_moved_paths = {f["original"] for f in existing_manifest["files"] if "original" in f}
+        original_tokens_from_manifest = existing_manifest.get("original_tokens")
         if already_moved_paths:
-            print(f"{COLORS.CYAN}ℹ️  Found {len(already_moved_paths)} previously moved files{COLORS.END}\n")
+            print(f"\n  {COLORS.CYAN}ℹ️  Project already optimized:{COLORS.END}")
+            print(f"     {len(already_moved_paths)} files previously moved")
+            if original_tokens_from_manifest:
+                orig_m = original_tokens_from_manifest / 1_000_000
+                print(f"     Original tokens: {orig_m:.1f}M → current scan")
+            print()
     
     # Step 1: Scan
     print(f"{COLORS.CYAN}[1/6] Scanning project...{COLORS.END}")
@@ -775,6 +823,18 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
             result.files_moved = len(move_result.moved_files)
             result.tokens_saved = sum(f.estimated_tokens for f in move_result.moved_files)
             print(f"  ✅ Moved {result.files_moved} files")
+            
+            # Update manifest with original_tokens if files were moved
+            if move_result.manifest_file and move_result.manifest_file.exists():
+                from ..core.paths import load_manifest, save_manifest
+                import json
+                manifest = json.loads(move_result.manifest_file.read_text(encoding='utf-8'))
+                # Save original_tokens from current scan
+                manifest["original_tokens"] = scan_result.total_tokens
+                move_result.manifest_file.write_text(
+                    json.dumps(manifest, indent=2, ensure_ascii=False),
+                    encoding='utf-8'
+                )
             
             # Show symlinks created
             if move_result.symlinks_created:
@@ -910,6 +970,9 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
     
     # Summary with beautiful output
     if not dry_run:
+        # Check if project was already optimized
+        is_already_opt = bool(already_moved_paths and result.files_moved == 0)
+        
         print_optimization_result(
             project_name=project_path.name,
             before_tokens=scan_result.total_tokens,
@@ -919,6 +982,7 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
             symlinks_created=len(move_result.symlinks_created) if move_result and move_result.symlinks_created else 0,
             dynamic_warnings=len(patch_report.dynamic_path_warnings) if patch_report and patch_report.dynamic_path_warnings else 0,
             ast_skeleton=ast_skeleton,
+            is_already_optimized=is_already_opt,
         )
     
     if result.errors:
