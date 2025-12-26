@@ -514,6 +514,9 @@ def get_moveable_files(
     - Files in exclude_paths (already moved)
     """
     exclude_paths = exclude_paths or set()
+    # Нормализуем exclude_paths для cross-platform совместимости
+    normalized_exclude = {p.replace("\\", "/") for p in exclude_paths}
+    
     moveable = []
     skipped_reasons = {"py": 0, "config": 0, "already_moved": 0, "external_dir": 0}
     
@@ -530,12 +533,16 @@ def get_moveable_files(
     external_dir_patterns = ["_venvs/", "_data/", "_artifacts/", "_logs/", "_fox/"]
     
     for hf in result.heavy_files:
+        # Нормализуем путь для cross-platform совместимости
+        normalized_path = hf.relative_path.replace("\\", "/")
+        
         # DEBUG: показать почему пропускается
         if debug:
-            print(f"     DEBUG: Checking {hf.relative_path} ({hf.estimated_tokens} tokens)")
+            print(f"     DEBUG: Checking {normalized_path} ({hf.estimated_tokens} tokens)")
+            print(f"     DEBUG: exclude_paths contains: {normalized_path in normalized_exclude}")
         
-        # Пропускаем уже перемещённые
-        if hf.relative_path in exclude_paths:
+        # Пропускаем уже перемещённые (используем нормализованный путь)
+        if normalized_path in normalized_exclude:
             skipped_reasons["already_moved"] += 1
             if debug:
                 print(f"     DEBUG: skip already_moved: {hf.relative_path}")
@@ -556,8 +563,7 @@ def get_moveable_files(
             continue
         
         # Skip files already in external dirs (FIX: check path START, not substring!)
-        # Normalize path separators for cross-platform compatibility
-        normalized_path = hf.relative_path.replace("\\", "/")
+        # normalized_path уже вычислен выше
         is_in_external = any(normalized_path.startswith(pattern) for pattern in external_dir_patterns)
         
         if is_in_external:
