@@ -417,7 +417,8 @@ def print_optimization_result(
     files_moved: int,
     files_patched: int,
     symlinks_created: int,
-    dynamic_warnings: int
+    dynamic_warnings: int,
+    ast_skeleton=None
 ):
     """Print beautiful optimization result."""
     print()
@@ -436,6 +437,13 @@ def print_optimization_result(
     print(f"║  Files moved:         {files_moved:>8}                                   ║")
     print(f"║  Files patched:       {files_patched:>8}                                   ║")
     
+    # Show .py files optimization if AST skeleton was generated
+    if ast_skeleton and ast_skeleton.files:
+        py_orig_k = ast_skeleton.total_original_tokens / 1000
+        py_skel_k = ast_skeleton.total_skeleton_tokens / 1000
+        py_reduction = ast_skeleton.reduction_percent
+        print(f"║  .py files:            {py_orig_k:>6.0f}K     →   {py_skel_k:>6.0f}K  (AST skeleton, {py_reduction}%)  ║")
+    
     if symlinks_created > 0:
         print(f"║  Symlinks created:    {symlinks_created:>8}                                   ║")
     
@@ -446,6 +454,8 @@ def print_optimization_result(
     print("║  📄 Generated Files:                                             ║")
     print("║  ├─ config_paths.py          (bridge to external files)          ║")
     print("║  ├─ AST_FOX_TRACE.md         (navigation map for AI)             ║")
+    if ast_skeleton and ast_skeleton.files:
+        print("║  ├─ AST_CODE_MAP.md          (Python code skeletons)            ║")
     print("║  └─ .cursorignore            (updated)                           ║")
     print("╠══════════════════════════════════════════════════════════════════╣")
     print("║  💡 Your project is now AI-optimized!                            ║")
@@ -861,6 +871,28 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
     else:
         print("  Skipped (dry run or no moved files)")
     
+    # Step 5.5: Generate AST Code Map for .py files
+    print(f"\n{COLORS.CYAN}[5.5/6] Generating AST code map...{COLORS.END}")
+    ast_skeleton = None
+    if not dry_run:
+        try:
+            from ..mapper.ast_skeleton import generate_ast_code_map
+            
+            map_path, ast_skeleton = generate_ast_code_map(project_path)
+            
+            if ast_skeleton and ast_skeleton.files:
+                reduction = ast_skeleton.reduction_percent
+                orig_k = ast_skeleton.total_original_tokens / 1000
+                skel_k = ast_skeleton.total_skeleton_tokens / 1000
+                print(f"  ✅ Created AST_CODE_MAP.md")
+                print(f"     {len(ast_skeleton.files)} Python files analyzed")
+                print(f"     {orig_k:.0f}K tokens → {skel_k:.0f}K tokens ({reduction}% reduction)")
+            else:
+                print(f"  ⚠️  No Python files found for skeleton")
+        except Exception as e:
+            result.errors.append(f"AST code map failed: {e}")
+            print(f"  {COLORS.RED}❌ Failed: {e}{COLORS.END}")
+    
     # Step 6: Garbage
     print(f"\n{COLORS.CYAN}[6/6] Cleaning garbage...{COLORS.END}")
     try:
@@ -886,6 +918,7 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
             files_patched=result.files_patched,
             symlinks_created=len(move_result.symlinks_created) if move_result and move_result.symlinks_created else 0,
             dynamic_warnings=len(patch_report.dynamic_path_warnings) if patch_report and patch_report.dynamic_path_warnings else 0,
+            ast_skeleton=ast_skeleton,
         )
     
     if result.errors:
