@@ -1,0 +1,156 @@
+// Mini App JS — {{project_name}}
+
+// Инициализация Telegram Web App
+const tg = window.Telegram.WebApp;
+
+// Сообщаем что приложение готово
+tg.ready();
+
+// Расширяем на весь экран
+tg.expand();
+
+// Получаем данные пользователя
+const user = tg.initDataUnsafe?.user;
+
+// Отображаем информацию о пользователе
+const userInfoEl = document.getElementById('userInfo');
+if (user) {
+    userInfoEl.innerHTML = `
+        <h3>👤 Пользователь</h3>
+        <p><strong>Имя:</strong> ${user.first_name} ${user.last_name || ''}</p>
+        <p><strong>Username:</strong> @${user.username || 'не указан'}</p>
+        <p><strong>ID:</strong> ${user.id}</p>
+    `;
+} else {
+    userInfoEl.innerHTML = '<p>Откройте через Telegram</p>';
+}
+
+// Обработчик кнопки
+document.getElementById('mainBtn').addEventListener('click', () => {
+    tg.showAlert('Привет! 👋');
+});
+
+// Main Button (нативная кнопка Telegram)
+tg.MainButton.setText('Готово');
+tg.MainButton.onClick(() => {
+    tg.close();
+});
+// tg.MainButton.show();  // Раскомментируй если нужна
+
+
+
+// Инициализация Telegram Web App
+const tg = window.Telegram.WebApp;
+
+// Сообщаем что приложение готово
+tg.ready();
+
+// Расширяем на весь экран
+tg.expand();
+
+// Получаем данные пользователя
+const user = tg.initDataUnsafe?.user;
+
+// Отображаем информацию о пользователе
+const userInfoEl = document.getElementById('userInfo');
+if (user) {
+    userInfoEl.innerHTML = `
+        <h3>👤 Пользователь</h3>
+        <p><strong>Имя:</strong> ${user.first_name} ${user.last_name || ''}</p>
+        <p><strong>Username:</strong> @${user.username || 'не указан'}</p>
+        <p><strong>ID:</strong> ${user.id}</p>
+    `;
+} else {
+    userInfoEl.innerHTML = '<p>Откройте через Telegram</p>';
+}
+
+// Обработчик кнопки
+document.getElementById('mainBtn').addEventListener('click', () => {
+    tg.showAlert('Привет! 👋');
+});
+
+// Main Button (нативная кнопка Telegram)
+tg.MainButton.setText('Готово');
+tg.MainButton.onClick(() => {
+    tg.close();
+});
+// tg.MainButton.show();  // Раскомментируй если нужна
+
+
+
+// Инициализация Telegram Web App
+const tg = window.Telegram.WebApp;
+
+// Сообщаем что приложение готово
+tg.ready();
+
+// Расширяем на весь экран
+tg.expand();
+
+// Получаем данные пользователя
+const user = tg.initDataUnsafe?.user;
+
+// Отображаем информацию о пользователе
+const userInfoEl = document.getElementById('userInfo');
+if (user) {
+    userInfoEl.innerHTML = `
+        <h3>👤 Пользователь</h3>
+        <p><strong>Имя:</strong> ${user.first_name} ${user.last_name || ''}</p>
+        <p><strong>Username:</strong> @${user.username || 'не указан'}</p>
+        <p><strong>ID:</strong> ${user.id}</p>
+    `;
+} else {
+    userInfoEl.innerHTML = '<p>Откройте через Telegram</p>';
+}
+
+// Обработчик кнопки
+document.getElementById('mainBtn').addEventListener('click', () => {
+    tg.showAlert('Привет! 👋');
+});
+
+// Main Button (нативная кнопка Telegram)
+tg.MainButton.setText('Готово');
+tg.MainButton.onClick(() => {
+    tg.close();
+});
+// tg.MainButton.show();  // Раскомментируй если нужна
+
+
+
+// Инициализация Telegram Web App
+const tg = window.Telegram.WebApp;
+
+// Сообщаем что приложение готово
+tg.ready();
+
+// Расширяем на весь экран
+tg.expand();
+
+// Получаем данные пользователя
+const user = tg.initDataUnsafe?.user;
+
+// Отображаем информацию о пользователе
+const userInfoEl = document.getElementById('userInfo');
+if (user) {
+    userInfoEl.innerHTML = `
+        <h3>👤 Пользователь</h3>
+        <p><strong>Имя:</strong> ${user.first_name} ${user.last_name || ''}</p>
+        <p><strong>Username:</strong> @${user.username || 'не указан'}</p>
+        <p><strong>ID:</strong> ${user.id}</p>
+    `;
+} else {
+    userInfoEl.innerHTML = '<p>Откройте через Telegram</p>';
+}
+
+// Обработчик кнопки
+document.getElementById('mainBtn').addEventListener('click', () => {
+    tg.showAlert('Привет! 👋');
+});
+
+// Main Button (нативная кнопка Telegram)
+tg.MainButton.setText('Готово');
+tg.MainButton.onClick(() => {
+    tg.close();
+});
+// tg.MainButton.show();  // Раскомментируй если нужна
+

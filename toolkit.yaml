@@ -1,0 +1,17 @@
+# AI Toolkit v3.0 Configuration
+
+version: "3.0.0"
+
+paths:
+  venvs: "../_venvs"
+  data: "../_data"
+  artifacts: "../_artifacts"
+
+defaults:
+  template: "bot"
+  ide: "all"
+  docker: true
+  ci: true
+  git: true
+
+plugins_dir: "~/.ai_toolkit/plugins"

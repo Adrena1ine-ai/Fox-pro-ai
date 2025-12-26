@@ -1,0 +1,532 @@
+"""🕷️ Web Scraper — {{project_name}}"""
+
+import asyncio
+import logging
+from typing import Any
+
+import httpx
+from bs4 import BeautifulSoup
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+# ══════════════════════════════════════════════════════════════
+# HTTP Client
+# ══════════════════════════════════════════════════════════════
+
+async def fetch_page(url: str, timeout: float = 30.0) -> str:
+    """
+    Загрузить страницу по URL
+    
+    Args:
+        url: URL страницы
+        timeout: Таймаут в секундах
+        
+    Returns:
+        HTML контент страницы
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+    }
+    
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.get(url, headers=headers)
+        response.raise_for_status()
+        return response.text
+
+
+# ══════════════════════════════════════════════════════════════
+# Parser
+# ══════════════════════════════════════════════════════════════
+
+def parse_html(html: str) -> BeautifulSoup:
+    """
+    Парсинг HTML в BeautifulSoup объект
+    
+    Args:
+        html: HTML строка
+        
+    Returns:
+        BeautifulSoup объект
+    """
+    return BeautifulSoup(html, "lxml")
+
+
+def extract_links(soup: BeautifulSoup, base_url: str = "") -> list[str]:
+    """
+    Извлечь все ссылки со страницы
+    
+    Args:
+        soup: BeautifulSoup объект
+        base_url: Базовый URL для относительных ссылок
+        
+    Returns:
+        Список ссылок
+    """
+    links = []
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if href.startswith("/"):
+            href = base_url.rstrip("/") + href
+        if href.startswith("http"):
+            links.append(href)
+    return links
+
+
+def extract_text(soup: BeautifulSoup, selector: str) -> str:
+    """
+    Извлечь текст по CSS селектору
+    
+    Args:
+        soup: BeautifulSoup объект
+        selector: CSS селектор
+        
+    Returns:
+        Текст элемента
+    """
+    element = soup.select_one(selector)
+    return element.get_text(strip=True) if element else ""
+
+
+# ══════════════════════════════════════════════════════════════
+# Main
+# ══════════════════════════════════════════════════════════════
+
+async def scrape(url: str) -> dict[str, Any]:
+    """
+    Основная функция парсинга
+    
+    Args:
+        url: URL для парсинга
+        
+    Returns:
+        Словарь с результатами
+    """
+    logger.info(f"Scraping: {url}")
+    
+    html = await fetch_page(url)
+    soup = parse_html(html)
+    
+    result = {
+        "url": url,
+        "title": extract_text(soup, "title"),
+        "links_count": len(extract_links(soup, url)),
+    }
+    
+    logger.info(f"Done: {result['title']}")
+    return result
+
+
+async def main():
+    """Entry point"""
+    url = "https://example.com"
+    result = await scrape(url)
+    print(result)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+
+
+import asyncio
+import logging
+from typing import Any
+
+import httpx
+from bs4 import BeautifulSoup
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+# ══════════════════════════════════════════════════════════════
+# HTTP Client
+# ══════════════════════════════════════════════════════════════
+
+async def fetch_page(url: str, timeout: float = 30.0) -> str:
+    """
+    Загрузить страницу по URL
+    
+    Args:
+        url: URL страницы
+        timeout: Таймаут в секундах
+        
+    Returns:
+        HTML контент страницы
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+    }
+    
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.get(url, headers=headers)
+        response.raise_for_status()
+        return response.text
+
+
+# ══════════════════════════════════════════════════════════════
+# Parser
+# ══════════════════════════════════════════════════════════════
+
+def parse_html(html: str) -> BeautifulSoup:
+    """
+    Парсинг HTML в BeautifulSoup объект
+    
+    Args:
+        html: HTML строка
+        
+    Returns:
+        BeautifulSoup объект
+    """
+    return BeautifulSoup(html, "lxml")
+
+
+def extract_links(soup: BeautifulSoup, base_url: str = "") -> list[str]:
+    """
+    Извлечь все ссылки со страницы
+    
+    Args:
+        soup: BeautifulSoup объект
+        base_url: Базовый URL для относительных ссылок
+        
+    Returns:
+        Список ссылок
+    """
+    links = []
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if href.startswith("/"):
+            href = base_url.rstrip("/") + href
+        if href.startswith("http"):
+            links.append(href)
+    return links
+
+
+def extract_text(soup: BeautifulSoup, selector: str) -> str:
+    """
+    Извлечь текст по CSS селектору
+    
+    Args:
+        soup: BeautifulSoup объект
+        selector: CSS селектор
+        
+    Returns:
+        Текст элемента
+    """
+    element = soup.select_one(selector)
+    return element.get_text(strip=True) if element else ""
+
+
+# ══════════════════════════════════════════════════════════════
+# Main
+# ══════════════════════════════════════════════════════════════
+
+async def scrape(url: str) -> dict[str, Any]:
+    """
+    Основная функция парсинга
+    
+    Args:
+        url: URL для парсинга
+        
+    Returns:
+        Словарь с результатами
+    """
+    logger.info(f"Scraping: {url}")
+    
+    html = await fetch_page(url)
+    soup = parse_html(html)
+    
+    result = {
+        "url": url,
+        "title": extract_text(soup, "title"),
+        "links_count": len(extract_links(soup, url)),
+    }
+    
+    logger.info(f"Done: {result['title']}")
+    return result
+
+
+async def main():
+    """Entry point"""
+    url = "https://example.com"
+    result = await scrape(url)
+    print(result)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+
+
+import asyncio
+import logging
+from typing import Any
+
+import httpx
+from bs4 import BeautifulSoup
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+# ══════════════════════════════════════════════════════════════
+# HTTP Client
+# ══════════════════════════════════════════════════════════════
+
+async def fetch_page(url: str, timeout: float = 30.0) -> str:
+    """
+    Загрузить страницу по URL
+    
+    Args:
+        url: URL страницы
+        timeout: Таймаут в секундах
+        
+    Returns:
+        HTML контент страницы
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+    }
+    
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.get(url, headers=headers)
+        response.raise_for_status()
+        return response.text
+
+
+# ══════════════════════════════════════════════════════════════
+# Parser
+# ══════════════════════════════════════════════════════════════
+
+def parse_html(html: str) -> BeautifulSoup:
+    """
+    Парсинг HTML в BeautifulSoup объект
+    
+    Args:
+        html: HTML строка
+        
+    Returns:
+        BeautifulSoup объект
+    """
+    return BeautifulSoup(html, "lxml")
+
+
+def extract_links(soup: BeautifulSoup, base_url: str = "") -> list[str]:
+    """
+    Извлечь все ссылки со страницы
+    
+    Args:
+        soup: BeautifulSoup объект
+        base_url: Базовый URL для относительных ссылок
+        
+    Returns:
+        Список ссылок
+    """
+    links = []
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if href.startswith("/"):
+            href = base_url.rstrip("/") + href
+        if href.startswith("http"):
+            links.append(href)
+    return links
+
+
+def extract_text(soup: BeautifulSoup, selector: str) -> str:
+    """
+    Извлечь текст по CSS селектору
+    
+    Args:
+        soup: BeautifulSoup объект
+        selector: CSS селектор
+        
+    Returns:
+        Текст элемента
+    """
+    element = soup.select_one(selector)
+    return element.get_text(strip=True) if element else ""
+
+
+# ══════════════════════════════════════════════════════════════
+# Main
+# ══════════════════════════════════════════════════════════════
+
+async def scrape(url: str) -> dict[str, Any]:
+    """
+    Основная функция парсинга
+    
+    Args:
+        url: URL для парсинга
+        
+    Returns:
+        Словарь с результатами
+    """
+    logger.info(f"Scraping: {url}")
+    
+    html = await fetch_page(url)
+    soup = parse_html(html)
+    
+    result = {
+        "url": url,
+        "title": extract_text(soup, "title"),
+        "links_count": len(extract_links(soup, url)),
+    }
+    
+    logger.info(f"Done: {result['title']}")
+    return result
+
+
+async def main():
+    """Entry point"""
+    url = "https://example.com"
+    result = await scrape(url)
+    print(result)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+
+
+import asyncio
+import logging
+from typing import Any
+
+import httpx
+from bs4 import BeautifulSoup
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+# ══════════════════════════════════════════════════════════════
+# HTTP Client
+# ══════════════════════════════════════════════════════════════
+
+async def fetch_page(url: str, timeout: float = 30.0) -> str:
+    """
+    Загрузить страницу по URL
+    
+    Args:
+        url: URL страницы
+        timeout: Таймаут в секундах
+        
+    Returns:
+        HTML контент страницы
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+    }
+    
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.get(url, headers=headers)
+        response.raise_for_status()
+        return response.text
+
+
+# ══════════════════════════════════════════════════════════════
+# Parser
+# ══════════════════════════════════════════════════════════════
+
+def parse_html(html: str) -> BeautifulSoup:
+    """
+    Парсинг HTML в BeautifulSoup объект
+    
+    Args:
+        html: HTML строка
+        
+    Returns:
+        BeautifulSoup объект
+    """
+    return BeautifulSoup(html, "lxml")
+
+
+def extract_links(soup: BeautifulSoup, base_url: str = "") -> list[str]:
+    """
+    Извлечь все ссылки со страницы
+    
+    Args:
+        soup: BeautifulSoup объект
+        base_url: Базовый URL для относительных ссылок
+        
+    Returns:
+        Список ссылок
+    """
+    links = []
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if href.startswith("/"):
+            href = base_url.rstrip("/") + href
+        if href.startswith("http"):
+            links.append(href)
+    return links
+
+
+def extract_text(soup: BeautifulSoup, selector: str) -> str:
+    """
+    Извлечь текст по CSS селектору
+    
+    Args:
+        soup: BeautifulSoup объект
+        selector: CSS селектор
+        
+    Returns:
+        Текст элемента
+    """
+    element = soup.select_one(selector)
+    return element.get_text(strip=True) if element else ""
+
+
+# ══════════════════════════════════════════════════════════════
+# Main
+# ══════════════════════════════════════════════════════════════
+
+async def scrape(url: str) -> dict[str, Any]:
+    """
+    Основная функция парсинга
+    
+    Args:
+        url: URL для парсинга
+        
+    Returns:
+        Словарь с результатами
+    """
+    logger.info(f"Scraping: {url}")
+    
+    html = await fetch_page(url)
+    soup = parse_html(html)
+    
+    result = {
+        "url": url,
+        "title": extract_text(soup, "title"),
+        "links_count": len(extract_links(soup, url)),
+    }
+    
+    logger.info(f"Done: {result['title']}")
+    return result
+
+
+async def main():
+    """Entry point"""
+    url = "https://example.com"
+    result = await scrape(url)
+    print(result)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+

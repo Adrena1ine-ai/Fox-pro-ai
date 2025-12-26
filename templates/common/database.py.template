@@ -1,0 +1,244 @@
+"""Database operations — {{project_name}}"""
+
+import aiosqlite
+from config import settings
+
+
+async def init_db() -> None:
+    """Инициализация базы данных"""
+    settings.database_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY,
+                telegram_id INTEGER UNIQUE NOT NULL,
+                username TEXT,
+                first_name TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        await db.commit()
+
+
+async def get_user(telegram_id: int) -> dict | None:
+    """Получить пользователя по telegram_id"""
+    async with aiosqlite.connect(settings.database_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM users WHERE telegram_id = ?",
+            (telegram_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+
+async def create_user(
+    telegram_id: int,
+    username: str | None = None,
+    first_name: str | None = None
+) -> bool:
+    """Создать пользователя"""
+    async with aiosqlite.connect(settings.database_path) as db:
+        try:
+            await db.execute(
+                "INSERT INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)",
+                (telegram_id, username, first_name)
+            )
+            await db.commit()
+            return True
+        except aiosqlite.IntegrityError:
+            return False
+
+
+async def get_all_users() -> list[dict]:
+    """Получить всех пользователей"""
+    async with aiosqlite.connect(settings.database_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM users") as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+
+
+import aiosqlite
+from config import settings
+
+
+async def init_db() -> None:
+    """Инициализация базы данных"""
+    settings.database_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY,
+                telegram_id INTEGER UNIQUE NOT NULL,
+                username TEXT,
+                first_name TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        await db.commit()
+
+
+async def get_user(telegram_id: int) -> dict | None:
+    """Получить пользователя по telegram_id"""
+    async with aiosqlite.connect(settings.database_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM users WHERE telegram_id = ?",
+            (telegram_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+
+async def create_user(
+    telegram_id: int,
+    username: str | None = None,
+    first_name: str | None = None
+) -> bool:
+    """Создать пользователя"""
+    async with aiosqlite.connect(settings.database_path) as db:
+        try:
+            await db.execute(
+                "INSERT INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)",
+                (telegram_id, username, first_name)
+            )
+            await db.commit()
+            return True
+        except aiosqlite.IntegrityError:
+            return False
+
+
+async def get_all_users() -> list[dict]:
+    """Получить всех пользователей"""
+    async with aiosqlite.connect(settings.database_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM users") as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+
+
+import aiosqlite
+from config import settings
+
+
+async def init_db() -> None:
+    """Инициализация базы данных"""
+    settings.database_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY,
+                telegram_id INTEGER UNIQUE NOT NULL,
+                username TEXT,
+                first_name TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        await db.commit()
+
+
+async def get_user(telegram_id: int) -> dict | None:
+    """Получить пользователя по telegram_id"""
+    async with aiosqlite.connect(settings.database_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM users WHERE telegram_id = ?",
+            (telegram_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+
+async def create_user(
+    telegram_id: int,
+    username: str | None = None,
+    first_name: str | None = None
+) -> bool:
+    """Создать пользователя"""
+    async with aiosqlite.connect(settings.database_path) as db:
+        try:
+            await db.execute(
+                "INSERT INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)",
+                (telegram_id, username, first_name)
+            )
+            await db.commit()
+            return True
+        except aiosqlite.IntegrityError:
+            return False
+
+
+async def get_all_users() -> list[dict]:
+    """Получить всех пользователей"""
+    async with aiosqlite.connect(settings.database_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM users") as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+
+
+import aiosqlite
+from config import settings
+
+
+async def init_db() -> None:
+    """Инициализация базы данных"""
+    settings.database_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY,
+                telegram_id INTEGER UNIQUE NOT NULL,
+                username TEXT,
+                first_name TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        await db.commit()
+
+
+async def get_user(telegram_id: int) -> dict | None:
+    """Получить пользователя по telegram_id"""
+    async with aiosqlite.connect(settings.database_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM users WHERE telegram_id = ?",
+            (telegram_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+
+async def create_user(
+    telegram_id: int,
+    username: str | None = None,
+    first_name: str | None = None
+) -> bool:
+    """Создать пользователя"""
+    async with aiosqlite.connect(settings.database_path) as db:
+        try:
+            await db.execute(
+                "INSERT INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)",
+                (telegram_id, username, first_name)
+            )
+            await db.commit()
+            return True
+        except aiosqlite.IntegrityError:
+            return False
+
+
+async def get_all_users() -> list[dict]:
+    """Получить всех пользователей"""
+    async with aiosqlite.connect(settings.database_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM users") as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+

@@ -1,0 +1,76 @@
+"""Start handler"""
+from aiogram import Router
+from aiogram.filters import CommandStart, Command
+from aiogram.types import Message
+
+router = Router()
+
+
+@router.message(CommandStart())
+async def cmd_start(message: Message):
+    """Обработчик команды /start"""
+    await message.answer(f"👋 Привет, <b>{message.from_user.first_name}</b>!")
+
+
+@router.message(Command("help"))
+async def cmd_help(message: Message):
+    """Обработчик команды /help"""
+    await message.answer("📚 /start — Начать\n/help — Помощь")
+
+
+from aiogram import Router
+from aiogram.filters import CommandStart, Command
+from aiogram.types import Message
+
+router = Router()
+
+
+@router.message(CommandStart())
+async def cmd_start(message: Message):
+    """Обработчик команды /start"""
+    await message.answer(f"👋 Привет, <b>{message.from_user.first_name}</b>!")
+
+
+@router.message(Command("help"))
+async def cmd_help(message: Message):
+    """Обработчик команды /help"""
+    await message.answer("📚 /start — Начать\n/help — Помощь")
+
+
+from aiogram import Router
+from aiogram.filters import CommandStart, Command
+from aiogram.types import Message
+
+router = Router()
+
+
+@router.message(CommandStart())
+async def cmd_start(message: Message):
+    """Обработчик команды /start"""
+    await message.answer(f"👋 Привет, <b>{message.from_user.first_name}</b>!")
+
+
+@router.message(Command("help"))
+async def cmd_help(message: Message):
+    """Обработчик команды /help"""
+    await message.answer("📚 /start — Начать\n/help — Помощь")
+
+
+from aiogram import Router
+from aiogram.filters import CommandStart, Command
+from aiogram.types import Message
+
+router = Router()
+
+
+@router.message(CommandStart())
+async def cmd_start(message: Message):
+    """Обработчик команды /start"""
+    await message.answer(f"👋 Привет, <b>{message.from_user.first_name}</b>!")
+
+
+@router.message(Command("help"))
+async def cmd_help(message: Message):
+    """Обработчик команды /help"""
+    await message.answer("📚 /start — Начать\n/help — Помощь")
+

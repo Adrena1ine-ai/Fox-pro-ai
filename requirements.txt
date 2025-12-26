@@ -1,0 +1,13 @@
+# Fox Pro AI v4.0 - Dependencies
+
+# Core
+pyyaml>=6.0
+
+# Token counting (optional but recommended)
+tiktoken>=0.5.0
+
+# Development dependencies (install with: pip install -e ".[dev]")
+# pytest>=8.0
+# pytest-cov>=4.1
+# mypy>=1.8
+# ruff>=0.3
