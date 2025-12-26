@@ -24,6 +24,14 @@ class FileCategory(Enum):
 
 
 @dataclass
+class FileTokens:
+    """Represents a file with its token count (for top consumers list)."""
+    path: Path
+    tokens: int
+    size_bytes: int
+
+
+@dataclass
 class HeavyFile:
     """Represents a file that exceeds token threshold."""
     path: Path
@@ -74,6 +82,8 @@ class ScanResult:
     node_modules_paths: List[Path] = field(default_factory=list)
     node_modules_total_size_mb: float = 0.0
     pycache_paths: List[Path] = field(default_factory=list)
+    # Все файлы с токенами (для топ-10)
+    file_tokens: List[FileTokens] = field(default_factory=list)
     
     @property
     def heavy_tokens(self) -> int:
@@ -179,6 +189,49 @@ def get_dir_size_mb(path: Path) -> float:
     return total / (1024 * 1024)
 
 
+def is_venv_directory(path: Path) -> bool:
+    """Check if directory is a Python virtual environment."""
+    name_lower = path.name.lower()
+    
+    # Проверка по имени (содержит venv или env)
+    venv_indicators = ['venv', '.venv', 'virtualenv']
+    is_venv_name = any(ind in name_lower for ind in venv_indicators)
+    
+    # Также проверяем env но только если это не .env файл конфига
+    if name_lower == 'env' or name_lower == '.env':
+        is_venv_name = True
+    
+    if not is_venv_name:
+        return False
+    
+    # Подтверждаем что это venv по содержимому
+    has_pyvenv_cfg = (path / 'pyvenv.cfg').exists()
+    has_scripts = (path / 'Scripts').exists()  # Windows
+    has_bin = (path / 'bin').exists()  # Linux/Mac
+    has_lib = (path / 'Lib').exists() or (path / 'lib').exists()
+    
+    return has_pyvenv_cfg or (has_scripts and has_lib) or (has_bin and has_lib)
+
+
+def find_all_venvs(project_path: Path) -> List[Path]:
+    """Find all virtual environments in project (including nested)."""
+    venvs = []
+    
+    try:
+        for item in project_path.rglob('*'):
+            if item.is_dir():
+                # Не заходим внутрь уже найденных venv
+                if any(venv in item.parents for venv in venvs):
+                    continue
+                
+                if is_venv_directory(item):
+                    venvs.append(item)
+    except (PermissionError, OSError):
+        pass
+    
+    return venvs
+
+
 def should_skip_dir(dir_name: str) -> bool:
     """Check if directory should be skipped."""
     return dir_name in SKIP_DIRS or (dir_name.startswith(".") and dir_name != ".github")
@@ -280,31 +333,20 @@ def scan_project(
         total_tokens=0
     )
     
-    # Обнаружение venv/node_modules (не сканируем содержимое, но фиксируем)
-    for item in project_path.iterdir():
-        if item.is_dir():
-            if item.name in {'venv', '.venv', 'env', '.env'}:
-                # Проверяем что это venv (есть pyvenv.cfg или Scripts/bin)
-                if (item / 'pyvenv.cfg').exists() or (item / 'Scripts').exists() or (item / 'bin').exists():
-                    if item not in result.venv_paths:
-                        result.venv_paths.append(item)
-                        result.venv_total_size_mb += get_dir_size_mb(item)
-            elif item.name == 'node_modules':
+    # Обнаружение всех venv (включая venv_gate, .venv_parser и т.д.)
+    result.venv_paths = find_all_venvs(project_path)
+    for venv_path in result.venv_paths:
+        result.venv_total_size_mb += get_dir_size_mb(venv_path)
+    
+    # Обнаружение node_modules
+    try:
+        for item in project_path.iterdir():
+            if item.is_dir() and item.name == 'node_modules':
                 if item not in result.node_modules_paths:
                     result.node_modules_paths.append(item)
                     result.node_modules_total_size_mb += get_dir_size_mb(item)
-    
-    # Рекурсивный поиск вложенных venv (но не слишком глубоко)
-    for venv_name in ['venv', '.venv', 'env']:
-        try:
-            for venv_path in project_path.rglob(venv_name):
-                if venv_path.is_dir() and venv_path not in result.venv_paths:
-                    # Проверяем что это действительно venv
-                    if (venv_path / 'pyvenv.cfg').exists() or (venv_path / 'Scripts').exists() or (venv_path / 'bin').exists():
-                        result.venv_paths.append(venv_path)
-                        result.venv_total_size_mb += get_dir_size_mb(venv_path)
-        except (OSError, PermissionError):
-            pass  # Пропускаем если нет доступа
+    except (OSError, PermissionError):
+        pass
     
     # Walk through project
     try:
@@ -341,6 +383,17 @@ def scan_project(
                     ext = file_path.suffix.lower() or "(no ext)"
                     result.tokens_by_ext[ext] = result.tokens_by_ext.get(ext, 0) + tokens
                     result.files_by_ext[ext] = result.files_by_ext.get(ext, 0) + 1
+                    
+                    # Сохраняем все файлы с токенами для топ-10
+                    try:
+                        size_bytes = file_path.stat().st_size
+                        result.file_tokens.append(FileTokens(
+                            path=file_path,
+                            tokens=tokens,
+                            size_bytes=size_bytes
+                        ))
+                    except (OSError, PermissionError):
+                        pass
                     
                     # Check if heavy
                     heavy_file = scan_file(

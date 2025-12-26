@@ -665,6 +665,18 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
                 tokens_str = f"{tokens/1000:.1f}K" if tokens < 1_000_000 else f"{tokens/1_000_000:.1f}M"
                 print(f"     {ext:<10} {tokens_str:>8} ({pct:>5.1f}%) — {count} files")
         
+        # Топ-10 файлов по токенам (независимо от порога)
+        if scan_result.file_tokens:
+            print(f"\n  📈 Top 10 token consumers:")
+            sorted_files = sorted(scan_result.file_tokens, key=lambda x: x.tokens, reverse=True)
+            for ft in sorted_files[:10]:
+                tokens_str = f"{ft.tokens/1000:.1f}K" if ft.tokens < 100000 else f"{ft.tokens/1000:.0f}K"
+                try:
+                    rel_path = str(ft.path.relative_to(project_path))[:50]
+                except ValueError:
+                    rel_path = str(ft.path)[:50]
+                print(f"     {tokens_str:>8}  {rel_path}")
+        
         # Показать какие heavy files найдены
         if scan_result.heavy_files:
             print(f"\n  📁 Heavy files (>{1000} tokens):")
@@ -676,17 +688,19 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
         
         # Показать найденные venv/node_modules
         if scan_result.venv_paths:
-            print(f"\n  {COLORS.RED}🔴 VENV FOUND INSIDE PROJECT:{COLORS.END}")
+            from ..scanner.token_scanner import get_dir_size_mb
+            print(f"\n  {COLORS.RED}🔴 VENV FOUND INSIDE PROJECT ({len(scan_result.venv_paths)} total):{COLORS.END}")
+            total_mb = 0
             for vp in scan_result.venv_paths:
+                size_mb = get_dir_size_mb(vp)
+                total_mb += size_mb
                 try:
-                    rel_path = vp.relative_to(project_path) if vp.is_relative_to(project_path) else vp.name
+                    rel_path = vp.relative_to(project_path)
                 except ValueError:
                     rel_path = vp.name
-                # Получаем размер для конкретного venv
-                from ..scanner.token_scanner import get_dir_size_mb
-                venv_size = get_dir_size_mb(vp)
-                print(f"     📁 {rel_path} ({venv_size:.1f} MB)")
-            print(f"     {COLORS.YELLOW}⚠️  This adds ~{int(scan_result.venv_total_size_mb * 250)}K tokens to AI context!{COLORS.END}")
+                print(f"     📁 {rel_path} ({size_mb:.1f} MB)")
+            print(f"     ─────────────────────────")
+            print(f"     Total: {total_mb:.1f} MB (~{int(total_mb * 250)}K tokens)")
         
         if scan_result.node_modules_paths:
             print(f"\n  {COLORS.RED}🔴 NODE_MODULES FOUND:{COLORS.END}")
