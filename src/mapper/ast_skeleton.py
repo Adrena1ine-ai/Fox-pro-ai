@@ -14,6 +14,69 @@ from typing import List, Optional, Dict, Set, Tuple
 from datetime import datetime
 
 
+# ══════════════════════════════════════════════════════════════
+# COMPATIBILITY HELPERS (Python 3.7+)
+# ══════════════════════════════════════════════════════════════
+
+def get_string_value(node) -> Optional[str]:
+    """Extract string value from AST node (compatible with Python 3.7+)."""
+    # Python 3.8+
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    # Python 3.7 fallback
+    if hasattr(ast, 'Str') and isinstance(node, ast.Str):
+        return node.s
+    return None
+
+
+def is_docstring(node) -> bool:
+    """Check if node is a docstring expression."""
+    if not isinstance(node, ast.Expr):
+        return False
+    return get_string_value(node.value) is not None
+
+
+def extract_docstring(body: list) -> Optional[str]:
+    """Extract docstring from function/class body."""
+    if not body:
+        return None
+    first = body[0]
+    if not isinstance(first, ast.Expr):
+        return None
+    doc = get_string_value(first.value)
+    if doc:
+        return doc.strip().split('\n')[0][:100]
+    return None
+
+
+def safe_unparse(node) -> str:
+    """Safely unparse AST node (fallback for Python < 3.9)."""
+    if hasattr(ast, 'unparse'):
+        return ast.unparse(node)
+    # Fallback: use astunparse or simple repr
+    try:
+        import astunparse
+        return astunparse.unparse(node)
+    except ImportError:
+        # Simple fallback for common cases
+        if isinstance(node, ast.Name):
+            return node.id
+        elif isinstance(node, ast.Attribute):
+            return f"{safe_unparse(node.value)}.{node.attr}"
+        elif isinstance(node, ast.Subscript):
+            return f"{safe_unparse(node.value)}[...]"
+        elif isinstance(node, ast.Constant):
+            if isinstance(node.value, str):
+                return f'"{node.value}"'
+            return str(node.value)
+        # Fallback for old Python versions
+        elif hasattr(ast, 'Str') and isinstance(node, ast.Str):
+            return f'"{node.s}"'
+        elif hasattr(ast, 'Num') and isinstance(node, ast.Num):
+            return str(node.n)
+        return "..."
+
+
 @dataclass
 class FunctionSkeleton:
     """Skeleton of a function/method."""
@@ -150,7 +213,7 @@ def _extract_function(node: ast.FunctionDef | ast.AsyncFunctionDef) -> FunctionS
         arg_str = arg.arg
         if arg.annotation:
             try:
-                arg_str += f": {ast.unparse(arg.annotation)}"
+                arg_str += f": {safe_unparse(arg.annotation)}"
             except (AttributeError, ValueError):
                 # Fallback for older Python or complex annotations
                 arg_str += ": ..."
@@ -165,7 +228,7 @@ def _extract_function(node: ast.FunctionDef | ast.AsyncFunctionDef) -> FunctionS
             arg_idx = num_args - num_defaults + i
             if arg_idx < len(args_parts):
                 try:
-                    default_str = ast.unparse(default)
+                    default_str = safe_unparse(default)
                     if len(default_str) > 20:
                         default_str = "..."
                     args_parts[arg_idx] += f" = {default_str}"
@@ -186,27 +249,18 @@ def _extract_function(node: ast.FunctionDef | ast.AsyncFunctionDef) -> FunctionS
     returns = None
     if node.returns:
         try:
-            returns = f"-> {ast.unparse(node.returns)}"
+            returns = f"-> {safe_unparse(node.returns)}"
         except (AttributeError, ValueError):
             returns = "-> ..."
     
     # Docstring (first line only)
-    docstring = None
-    if (node.body and isinstance(node.body[0], ast.Expr) and 
-        isinstance(node.body[0].value, ast.Constant) and
-        isinstance(node.body[0].value.value, str)):
-        doc = node.body[0].value.value.strip()
-        docstring = doc.split('\n')[0][:100]  # First line, max 100 chars
-    elif (node.body and isinstance(node.body[0], ast.Expr) and
-          isinstance(node.body[0].value, ast.Str)):  # Python < 3.8
-        doc = node.body[0].value.s.strip()
-        docstring = doc.split('\n')[0][:100]
+    docstring = extract_docstring(node.body)
     
     # Decorators
     decorators = []
     for d in node.decorator_list:
         try:
-            decorators.append(f"@{ast.unparse(d)}")
+            decorators.append(f"@{safe_unparse(d)}")
         except (AttributeError, ValueError):
             decorators.append("@...")
     
@@ -227,21 +281,12 @@ def _extract_class(node: ast.ClassDef) -> ClassSkeleton:
     bases = []
     for b in node.bases:
         try:
-            bases.append(ast.unparse(b))
+            bases.append(safe_unparse(b))
         except (AttributeError, ValueError):
             bases.append("...")
     
     # Docstring
-    docstring = None
-    if (node.body and isinstance(node.body[0], ast.Expr) and
-        isinstance(node.body[0].value, ast.Constant) and
-        isinstance(node.body[0].value.value, str)):
-        doc = node.body[0].value.value.strip()
-        docstring = doc.split('\n')[0][:100]
-    elif (node.body and isinstance(node.body[0], ast.Expr) and
-          isinstance(node.body[0].value, ast.Str)):  # Python < 3.8
-        doc = node.body[0].value.s.strip()
-        docstring = doc.split('\n')[0][:100]
+    docstring = extract_docstring(node.body)
     
     # Methods and class variables
     methods = []
