@@ -65,6 +65,9 @@ class ScanResult:
     heavy_files: List[HeavyFile] = field(default_factory=list)
     skipped_dirs: List[str] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
+    # Debug: breakdown by extension
+    tokens_by_ext: Dict[str, int] = field(default_factory=dict)
+    files_by_ext: Dict[str, int] = field(default_factory=dict)
     
     @property
     def heavy_tokens(self) -> int:
@@ -287,6 +290,11 @@ def scan_project(
                     tokens = estimate_tokens(file_path)
                     result.total_tokens += tokens
                     
+                    # Track breakdown by extension
+                    ext = file_path.suffix.lower() or "(no ext)"
+                    result.tokens_by_ext[ext] = result.tokens_by_ext.get(ext, 0) + tokens
+                    result.files_by_ext[ext] = result.files_by_ext.get(ext, 0) + 1
+                    
                     # Check if heavy
                     heavy_file = scan_file(
                         file_path, project_path, threshold, 
@@ -386,7 +394,8 @@ def format_scan_report(result: ScanResult) -> str:
 
 def get_moveable_files(
     result: ScanResult,
-    exclude_paths: set[str] | None = None
+    exclude_paths: Set[str] | None = None,
+    verbose: bool = True
 ) -> List[HeavyFile]:
     """
     Get files that can be safely moved to external storage.
@@ -394,6 +403,7 @@ def get_moveable_files(
     Args:
         result: ScanResult with heavy files
         exclude_paths: Set of relative paths to exclude (already moved files)
+        verbose: If True, show why files are skipped
     
     Excludes:
     - Python code files (.py) - project code should stay
@@ -403,6 +413,7 @@ def get_moveable_files(
     """
     exclude_paths = exclude_paths or set()
     moveable = []
+    skipped_reasons = {"py": 0, "config": 0, "already_moved": 0, "external_dir": 0}
     
     # Files that should NOT be moved (config files)
     protected_names = {
@@ -416,22 +427,37 @@ def get_moveable_files(
     for hf in result.heavy_files:
         # Пропускаем уже перемещённые
         if hf.relative_path in exclude_paths:
+            skipped_reasons["already_moved"] += 1
             continue
         
         # Не перемещаем Python файлы (код проекта)
         if hf.path.suffix == '.py':
+            skipped_reasons["py"] += 1
             continue
         
         # Не перемещаем конфиги
         if hf.path.name.lower() in protected_names:
+            skipped_reasons["config"] += 1
             continue
         
         # Skip files already in external dirs
         if any(external in hf.relative_path for external in ["_venvs", "_data", "_artifacts", "_logs", "_fox"]):
+            skipped_reasons["external_dir"] += 1
             continue
         
         # Всё остальное с >1000 токенов — перемещаем
         moveable.append(hf)
+    
+    if verbose and any(skipped_reasons.values()):
+        print(f"\n  ⏭️  Skipped from moving:")
+        if skipped_reasons["py"]:
+            print(f"     {skipped_reasons['py']} .py files (source code)")
+        if skipped_reasons["config"]:
+            print(f"     {skipped_reasons['config']} config files")
+        if skipped_reasons["already_moved"]:
+            print(f"     {skipped_reasons['already_moved']} already moved")
+        if skipped_reasons["external_dir"]:
+            print(f"     {skipped_reasons['external_dir']} in external dirs")
     
     return moveable
 

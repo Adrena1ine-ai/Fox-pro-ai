@@ -649,6 +649,30 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
         )
         print(f"  Found {len(scan_result.heavy_files)} heavy files")
         print(f"  Total tokens: {scan_result.total_tokens:,}")
+        
+        # DEBUG: Показать breakdown по расширениям
+        if scan_result.tokens_by_ext:
+            tokens_by_ext = scan_result.tokens_by_ext
+            files_by_ext = scan_result.files_by_ext
+            
+            # Сортируем по токенам
+            sorted_ext = sorted(tokens_by_ext.items(), key=lambda x: x[1], reverse=True)
+            
+            print(f"\n  📊 Token breakdown by file type:")
+            for ext, tokens in sorted_ext[:7]:
+                count = files_by_ext.get(ext, 0)
+                pct = (tokens / scan_result.total_tokens * 100) if scan_result.total_tokens > 0 else 0
+                tokens_str = f"{tokens/1000:.1f}K" if tokens < 1_000_000 else f"{tokens/1_000_000:.1f}M"
+                print(f"     {ext:<10} {tokens_str:>8} ({pct:>5.1f}%) — {count} files")
+        
+        # Показать какие heavy files найдены
+        if scan_result.heavy_files:
+            print(f"\n  📁 Heavy files (>{1000} tokens):")
+            for hf in scan_result.heavy_files[:10]:
+                tokens_str = f"{hf.estimated_tokens/1000:.1f}K" if hf.estimated_tokens < 1_000_000 else f"{hf.estimated_tokens/1_000_000:.1f}M"
+                print(f"     {tokens_str:>8}  {hf.relative_path}")
+            if len(scan_result.heavy_files) > 10:
+                print(f"     ... and {len(scan_result.heavy_files) - 10} more")
     except Exception as e:
         result.errors.append(f"Scan failed: {e}")
         result.success = False
@@ -656,7 +680,7 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
     
     # Step 2: Move
     print(f"\n{COLORS.CYAN}[2/6] Moving heavy files...{COLORS.END}")
-    moveable = get_moveable_files(scan_result, exclude_paths=already_moved_paths)
+    moveable = get_moveable_files(scan_result, exclude_paths=already_moved_paths, verbose=True)
     move_result = None  # Initialize for later checks
     
     if not moveable:
