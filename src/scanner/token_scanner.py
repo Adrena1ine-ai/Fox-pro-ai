@@ -495,7 +495,8 @@ def format_scan_report(result: ScanResult) -> str:
 def get_moveable_files(
     result: ScanResult,
     exclude_paths: Set[str] | None = None,
-    verbose: bool = True
+    verbose: bool = True,
+    debug: bool = False
 ) -> List[HeavyFile]:
     """
     Get files that can be safely moved to external storage.
@@ -504,11 +505,12 @@ def get_moveable_files(
         result: ScanResult with heavy files
         exclude_paths: Set of relative paths to exclude (already moved files)
         verbose: If True, show why files are skipped
+        debug: If True, show detailed debug output for each skipped file
     
     Excludes:
     - Python code files (.py) - project code should stay
     - Core config files that must stay in project
-    - Files already in external dirs
+    - Files already in external dirs (checking path START, not substring)
     - Files in exclude_paths (already moved)
     """
     exclude_paths = exclude_paths or set()
@@ -524,28 +526,49 @@ def get_moveable_files(
         "config_paths.py",  # Bridge file must stay
     }
     
+    # External dir patterns (must be at START of path, not substring!)
+    external_dir_patterns = ["_venvs/", "_data/", "_artifacts/", "_logs/", "_fox/"]
+    
     for hf in result.heavy_files:
+        # DEBUG: показать почему пропускается
+        if debug:
+            print(f"     DEBUG: Checking {hf.relative_path} ({hf.estimated_tokens} tokens)")
+        
         # Пропускаем уже перемещённые
         if hf.relative_path in exclude_paths:
             skipped_reasons["already_moved"] += 1
+            if debug:
+                print(f"     DEBUG: skip already_moved: {hf.relative_path}")
             continue
         
         # Не перемещаем Python файлы (код проекта)
         if hf.path.suffix == '.py':
             skipped_reasons["py"] += 1
+            if debug:
+                print(f"     DEBUG: skip .py: {hf.relative_path}")
             continue
         
         # Не перемещаем конфиги
         if hf.path.name.lower() in protected_names:
             skipped_reasons["config"] += 1
+            if debug:
+                print(f"     DEBUG: skip config: {hf.relative_path}")
             continue
         
-        # Skip files already in external dirs
-        if any(external in hf.relative_path for external in ["_venvs", "_data", "_artifacts", "_logs", "_fox"]):
+        # Skip files already in external dirs (FIX: check path START, not substring!)
+        # Normalize path separators for cross-platform compatibility
+        normalized_path = hf.relative_path.replace("\\", "/")
+        is_in_external = any(normalized_path.startswith(pattern) for pattern in external_dir_patterns)
+        
+        if is_in_external:
             skipped_reasons["external_dir"] += 1
+            if debug:
+                print(f"     DEBUG: skip external_dir: {hf.relative_path} (matches pattern)")
             continue
         
         # Всё остальное с >1000 токенов — перемещаем
+        if debug:
+            print(f"     DEBUG: ✅ MOVABLE: {hf.relative_path}")
         moveable.append(hf)
     
     if verbose and any(skipped_reasons.values()):

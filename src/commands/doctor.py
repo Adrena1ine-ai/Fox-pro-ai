@@ -746,7 +746,8 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
             result.errors.append(f"venv move setup failed: {e}")
     
     # Затем перемещаем heavy files
-    moveable = get_moveable_files(scan_result, exclude_paths=already_moved_paths, verbose=True)
+    # Включаем debug для диагностики проблем с перемещением
+    moveable = get_moveable_files(scan_result, exclude_paths=already_moved_paths, verbose=True, debug=False)
     move_result = None  # Initialize for later checks
     
     if not moveable:
