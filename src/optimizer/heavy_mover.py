@@ -202,8 +202,9 @@ def move_heavy_files(
         )
         
         # Generate manifest.json
+        # Note: original_tokens should be passed from caller (from scan_result.total_tokens BEFORE moving)
         result.manifest_file = generate_manifest(
-            project_path, result.moved_files, external_dir
+            project_path, result.moved_files, external_dir, original_tokens=None
         )
         
         # Update .cursorignore to exclude moved files

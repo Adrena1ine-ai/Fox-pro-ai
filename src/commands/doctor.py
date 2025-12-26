@@ -708,6 +708,10 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
         print(f"  Found {len(scan_result.heavy_files)} heavy files")
         print(f"  Total tokens: {scan_result.total_tokens:,}")
         
+        # Save original_tokens for manifest (before any files are moved)
+        # This ensures we track the true "before" state
+        current_scan_tokens = scan_result.total_tokens
+        
         # DEBUG: Показать breakdown по расширениям
         if scan_result.tokens_by_ext:
             tokens_by_ext = scan_result.tokens_by_ext
@@ -829,8 +833,9 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
                 from ..core.paths import load_manifest, save_manifest
                 import json
                 manifest = json.loads(move_result.manifest_file.read_text(encoding='utf-8'))
-                # Save original_tokens from current scan
-                manifest["original_tokens"] = scan_result.total_tokens
+                # Save original_tokens: preserve existing if present, otherwise use current scan (before moving)
+                if "original_tokens" not in manifest or not manifest.get("original_tokens"):
+                    manifest["original_tokens"] = current_scan_tokens
                 move_result.manifest_file.write_text(
                     json.dumps(manifest, indent=2, ensure_ascii=False),
                     encoding='utf-8'
@@ -973,9 +978,13 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
         # Check if project was already optimized
         is_already_opt = bool(already_moved_paths and result.files_moved == 0)
         
+        # Use original_tokens from manifest if available, otherwise use current scan
+        # This ensures we show correct BEFORE value on repeated runs
+        before_tokens_value = original_tokens_from_manifest if original_tokens_from_manifest else scan_result.total_tokens
+        
         print_optimization_result(
             project_name=project_path.name,
-            before_tokens=scan_result.total_tokens,
+            before_tokens=before_tokens_value,
             after_tokens=scan_result.total_tokens - result.tokens_saved,
             files_moved=result.files_moved,
             files_patched=result.files_patched,
