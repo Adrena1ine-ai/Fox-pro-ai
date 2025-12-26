@@ -673,6 +673,27 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
                 print(f"     {tokens_str:>8}  {hf.relative_path}")
             if len(scan_result.heavy_files) > 10:
                 print(f"     ... and {len(scan_result.heavy_files) - 10} more")
+        
+        # Показать найденные venv/node_modules
+        if scan_result.venv_paths:
+            print(f"\n  {COLORS.RED}🔴 VENV FOUND INSIDE PROJECT:{COLORS.END}")
+            for vp in scan_result.venv_paths:
+                try:
+                    rel_path = vp.relative_to(project_path) if vp.is_relative_to(project_path) else vp.name
+                except ValueError:
+                    rel_path = vp.name
+                # Получаем размер для конкретного venv
+                from ..scanner.token_scanner import get_dir_size_mb
+                venv_size = get_dir_size_mb(vp)
+                print(f"     📁 {rel_path} ({venv_size:.1f} MB)")
+            print(f"     {COLORS.YELLOW}⚠️  This adds ~{int(scan_result.venv_total_size_mb * 250)}K tokens to AI context!{COLORS.END}")
+        
+        if scan_result.node_modules_paths:
+            print(f"\n  {COLORS.RED}🔴 NODE_MODULES FOUND:{COLORS.END}")
+            for nm in scan_result.node_modules_paths:
+                from ..scanner.token_scanner import get_dir_size_mb
+                nm_size = get_dir_size_mb(nm)
+                print(f"     📁 {nm.name} ({nm_size:.1f} MB)")
     except Exception as e:
         result.errors.append(f"Scan failed: {e}")
         result.success = False
@@ -680,6 +701,37 @@ def full_optimization(project_path: Path, dry_run: bool = False) -> FixResult:
     
     # Step 2: Move
     print(f"\n{COLORS.CYAN}[2/6] Moving heavy files...{COLORS.END}")
+    
+    # Сначала перемещаем venv (если есть)
+    if scan_result.venv_paths and not dry_run:
+        from ..core.paths import get_external_venvs_dir, ensure_external_structure
+        
+        try:
+            ensure_external_structure(project_path)
+            external_venvs = get_external_venvs_dir(project_path)
+            
+            for venv_path in scan_result.venv_paths:
+                venv_name = venv_path.name
+                target = external_venvs / venv_name
+                
+                if target.exists():
+                    print(f"  ⚠️  {venv_name} already exists in external, skipping")
+                    continue
+                
+                try:
+                    from ..scanner.token_scanner import get_dir_size_mb
+                    venv_size = get_dir_size_mb(venv_path)
+                    print(f"  📦 Moving {venv_name} ({venv_size:.1f} MB)...")
+                    shutil.move(str(venv_path), str(target))
+                    print(f"  {COLORS.GREEN}✅ Moved {venv_name} → {target.relative_to(project_path.parent)}{COLORS.END}")
+                    result.files_moved += 1
+                except Exception as e:
+                    print(f"  {COLORS.RED}❌ Failed to move {venv_name}: {e}{COLORS.END}")
+                    result.errors.append(f"venv move failed: {e}")
+        except Exception as e:
+            result.errors.append(f"venv move setup failed: {e}")
+    
+    # Затем перемещаем heavy files
     moveable = get_moveable_files(scan_result, exclude_paths=already_moved_paths, verbose=True)
     move_result = None  # Initialize for later checks
     

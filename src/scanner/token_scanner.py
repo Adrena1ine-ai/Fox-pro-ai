@@ -68,6 +68,12 @@ class ScanResult:
     # Debug: breakdown by extension
     tokens_by_ext: Dict[str, int] = field(default_factory=dict)
     files_by_ext: Dict[str, int] = field(default_factory=dict)
+    # Обнаруженные проблемные директории
+    venv_paths: List[Path] = field(default_factory=list)
+    venv_total_size_mb: float = 0.0
+    node_modules_paths: List[Path] = field(default_factory=list)
+    node_modules_total_size_mb: float = 0.0
+    pycache_paths: List[Path] = field(default_factory=list)
     
     @property
     def heavy_tokens(self) -> int:
@@ -156,6 +162,21 @@ def estimate_tokens(file_path: Path) -> int:
         
     except (OSError, IOError):
         return 0
+
+
+def get_dir_size_mb(path: Path) -> float:
+    """Get directory size in MB (fast, без подсчёта токенов)."""
+    total = 0
+    try:
+        for f in path.rglob('*'):
+            if f.is_file():
+                try:
+                    total += f.stat().st_size
+                except (OSError, PermissionError):
+                    pass
+    except (OSError, PermissionError):
+        pass
+    return total / (1024 * 1024)
 
 
 def should_skip_dir(dir_name: str) -> bool:
@@ -258,6 +279,32 @@ def scan_project(
         total_files_scanned=0,
         total_tokens=0
     )
+    
+    # Обнаружение venv/node_modules (не сканируем содержимое, но фиксируем)
+    for item in project_path.iterdir():
+        if item.is_dir():
+            if item.name in {'venv', '.venv', 'env', '.env'}:
+                # Проверяем что это venv (есть pyvenv.cfg или Scripts/bin)
+                if (item / 'pyvenv.cfg').exists() or (item / 'Scripts').exists() or (item / 'bin').exists():
+                    if item not in result.venv_paths:
+                        result.venv_paths.append(item)
+                        result.venv_total_size_mb += get_dir_size_mb(item)
+            elif item.name == 'node_modules':
+                if item not in result.node_modules_paths:
+                    result.node_modules_paths.append(item)
+                    result.node_modules_total_size_mb += get_dir_size_mb(item)
+    
+    # Рекурсивный поиск вложенных venv (но не слишком глубоко)
+    for venv_name in ['venv', '.venv', 'env']:
+        try:
+            for venv_path in project_path.rglob(venv_name):
+                if venv_path.is_dir() and venv_path not in result.venv_paths:
+                    # Проверяем что это действительно venv
+                    if (venv_path / 'pyvenv.cfg').exists() or (venv_path / 'Scripts').exists() or (venv_path / 'bin').exists():
+                        result.venv_paths.append(venv_path)
+                        result.venv_total_size_mb += get_dir_size_mb(venv_path)
+        except (OSError, PermissionError):
+            pass  # Пропускаем если нет доступа
     
     # Walk through project
     try:
